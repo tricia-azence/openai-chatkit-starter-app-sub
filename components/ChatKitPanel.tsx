@@ -261,12 +261,18 @@ export function ChatKitPanel({
     [isWorkflowConfigured, setErrorState]
   );
 
-  const chatkit = useChatKit({
-    api: { getClientSecret },
-    theme: {
-      colorScheme: theme,
-      ...getThemeConfig(theme),
+const chatkit = useChatKit({
+  api: { getClientSecret },
+  theme: {
+    colorScheme: theme,
+    ...getThemeConfig(theme),
+    container: {
+      backgroundColor: "#FFFFFF",
     },
+    thread: {
+      backgroundColor: "#FFFFFF",
+    },
+  },
     startScreen: {
       greeting: GREETING,
       prompts: STARTER_PROMPTS,
