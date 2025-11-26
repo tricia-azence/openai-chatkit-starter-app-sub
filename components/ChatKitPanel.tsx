@@ -282,6 +282,7 @@ export function ChatKitPanel({
       feedback: false,
     },
     onClientTool: async (invocation: {
+      console.log("TOOL INVOCATION:", invocation.name, invocation.params);
       name: string;
       params: Record<string, unknown>;
     }) => {
