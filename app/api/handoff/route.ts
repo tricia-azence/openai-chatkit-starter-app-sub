@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-
+const ticketId = Math.random().toString(36).substring(2, 10).toUpperCase();
     const webhookUrl = process.env.SLACK_WEBHOOK_URL;
     if (!webhookUrl) {
       return NextResponse.json(
@@ -13,8 +13,8 @@ export async function POST(req: Request) {
     }
 
     // Format Slack ticket message
-    const text = `
-🟢 *New Human Handoff Request*
+const text = `
+🟢 *New Human Handoff Request*  (#${ticketId})
 
 *Name:* ${body.name}
 *Email:* ${body.email}
@@ -27,7 +27,6 @@ ${body.message}
 *Transcript (for context):*
 ${body.transcript || "_No transcript provided_"}
 `;
-
     // Send to Slack
     await fetch(webhookUrl, {
       method: "POST",
