@@ -12,20 +12,20 @@ export async function POST(req: Request) {
       );
     }
 
-    // Format Slack message
+    // Format Slack ticket message
     const text = `
-🔥 *New Human Handoff Request*
+🟢 *New Human Handoff Request*
 
-• *Name:* ${body.name}
-• *Email:* ${body.email}
-• *Phone:* ${body.phone ?? "N/A"}
-• *Company:* ${body.company ?? "N/A"}
+*Name:* ${body.name}
+*Email:* ${body.email}
+*Phone:* ${body.phone || "N/A"}
+*Company:* ${body.company || "N/A"}
 
-📝 *Message:*  
+*Message:*
 ${body.message}
 
-💬 *Transcript:*  
-${body.transcript ?? "(no transcript provided)"}
+*Transcript (for context):*
+${body.transcript || "_No transcript provided_"}
 `;
 
     // Send to Slack
