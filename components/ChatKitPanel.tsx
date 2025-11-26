@@ -314,7 +314,8 @@ export function ChatKitPanel({
       // NEW — Slack human handoff handler
 if (invocation.name === "handoff_to_slack") {
   try {
-    await fetch("/api/handoff", {
+    // CHANGE THIS LINE: Use your full Vercel domain
+    const response = await fetch("https://openai-chatkit-starter-app-sub.vercel.app/api/handoff", { 
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -322,17 +323,20 @@ if (invocation.name === "handoff_to_slack") {
       body: JSON.stringify(invocation.params),
     });
 
+    // Parse the response to check for errors properly
+    if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+    }
+
     return {
       success: true,
-      message:
-        "Thanks! Your details have been sent to the Azence team. A human will reach out shortly.",
+      message: "Thanks! Your details have been sent to the Azence team. A human will reach out shortly.",
     };
   } catch (err) {
     console.error("Slack handoff failed:", err);
     return {
       success: false,
-      message:
-        "Something went wrong while connecting you with a human. Please try again.",
+      message: "Something went wrong while connecting you with a human. Please try again.",
     };
   }
 }
