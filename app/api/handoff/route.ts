@@ -1,5 +1,18 @@
 import { NextResponse } from "next/server";
 
+// 1. Handle "Pre-flight" checks (Browsers ask permission first)
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      "Access-Control-Allow-Origin": "*", // Allows any domain (including sub.azence.com)
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    },
+  });
+}
+
+// 2. Handle the actual Data (The Handoff)
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -11,13 +24,16 @@ export async function POST(req: Request) {
     if (!webhookUrl) {
       return NextResponse.json(
         { error: "Missing SLACK_WEBHOOK_URL env variable" },
-        { status: 500 }
+        { 
+          status: 500,
+          headers: { "Access-Control-Allow-Origin": "*" } // Allow error to be seen
+        }
       );
     }
 
     // Format Slack ticket message
     const text = `
-🟢 *New Human Handoff Request*  (#${ticketId})
+🟢 *New Human Handoff Request* (#${ticketId})
 
 *Name:* ${body.name}
 *Email:* ${body.email}
@@ -31,7 +47,7 @@ ${body.message}
 ${body.transcript || "_No transcript provided_"}
 `;
 
-    // --- Send to Slack & capture response (for thread TS) ---
+    // --- Send to Slack & capture response ---
     const slackResp = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -46,18 +62,33 @@ ${body.transcript || "_No transcript provided_"}
       slackData = {};
     }
 
-    // Return ticket details + Slack thread ts (if available)
-    return NextResponse.json({
-      ok: true,
-      ticketId,
-      slackTs: slackData.ts || null,
-    });
+    // Return ticket details + CORS Headers (Crucial!)
+    return NextResponse.json(
+      {
+        ok: true,
+        ticketId,
+        slackTs: slackData.ts || null,
+      },
+      {
+        status: 200,
+        headers: {
+          "Access-Control-Allow-Origin": "*", // <--- THIS FIXES THE CORS ERROR
+          "Access-Control-Allow-Methods": "POST, OPTIONS",
+          "Access-Control-Allow-Headers": "Content-Type",
+        },
+      }
+    );
 
   } catch (err) {
     console.error("Error in /api/handoff:", err);
     return NextResponse.json(
       { error: "Failed to send handoff" },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: {
+          "Access-Control-Allow-Origin": "*", // Allow error to be seen
+        } 
+      }
     );
   }
 }
