@@ -15,9 +15,15 @@ export async function POST(req: Request) {
       );
     }
 
+    // Decide label based on type
+    const label =
+      body.type === "progressive_profile"
+        ? "🟣 Progressive Profile Update"
+        : "🟢 New Human Handoff Request";
+
     // Format Slack ticket message
     const text = `
-🟢 *New Human Handoff Request*  (#${ticketId})
+${label}  (#${ticketId})
 
 *Name:* ${body.name}
 *Email:* ${body.email}
@@ -25,7 +31,7 @@ export async function POST(req: Request) {
 *Company:* ${body.company || "N/A"}
 
 *Message:*
-${body.message}
+${body.message || "_No message provided_"}
 
 *Transcript (for context):*
 ${body.transcript || "_No transcript provided_"}
@@ -39,20 +45,30 @@ ${body.transcript || "_No transcript provided_"}
     });
 
     // Slack webhook may return empty or JSON — safely attempt parsing
-    let slackData: any = {};
+    let slackData: unknown = null;
     try {
       slackData = await slackResp.json();
     } catch {
-      slackData = {};
+      slackData = null;
+    }
+
+    // Safely extract ts if present
+    let slackTs: string | null = null;
+    if (
+      slackData &&
+      typeof slackData === "object" &&
+      "ts" in slackData &&
+      typeof (slackData as { ts: unknown }).ts === "string"
+    ) {
+      slackTs = (slackData as { ts: string }).ts;
     }
 
     // Return ticket details + Slack thread ts (if available)
     return NextResponse.json({
       ok: true,
       ticketId,
-      slackTs: slackData.ts || null,
+      slackTs,
     });
-
   } catch (err) {
     console.error("Error in /api/handoff:", err);
     return NextResponse.json(
