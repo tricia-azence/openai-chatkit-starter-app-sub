@@ -1,39 +1,80 @@
 import { NextResponse } from "next/server";
 
-// 1. Handle "Pre-flight" checks (Browsers ask permission first)
-export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      "Access-Control-Allow-Origin": "*", // Allows any domain (including sub.azence.com)
+export const runtime = "edge";
+
+// Automatically allow ONLY Azence-owned domains
+const ALLOWED_ORIGINS = [
+  "https://azence.com",
+  "https://www.azence.com",
+];
+
+// Allow all subdomains like
+// https://sub.azence.com, https://dev.azence.com, https://a.b.azence.com
+function isAzenceSubdomain(origin: string | null) {
+  if (!origin) return false;
+  try {
+    const { hostname } = new URL(origin);
+    return hostname === "azence.com" || hostname.endsWith(".azence.com");
+  } catch {
+    return false;
+  }
+}
+
+function buildCorsHeaders(origin: string | null) {
+  if (origin && (ALLOWED_ORIGINS.includes(origin) || isAzenceSubdomain(origin))) {
+    return {
+      "Access-Control-Allow-Origin": origin,
       "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
-    },
+    };
+  }
+
+  // Block external origins
+  return {
+    "Access-Control-Allow-Origin": "https://azence.com",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+  };
+}
+
+// Handle CORS preflight
+export async function OPTIONS(req: Request) {
+  const origin = req.headers.get("Origin");
+  return new NextResponse(null, {
+    status: 200,
+    headers: buildCorsHeaders(origin),
   });
 }
 
-// 2. Handle the actual Data (The Handoff)
+// Handle POST requests
 export async function POST(req: Request) {
+  const origin = req.headers.get("Origin");
+
   try {
     const body = await req.json();
 
-    // Generate a unique Ticket ID
-    const ticketId = Math.random().toString(36).substring(2, 10).toUpperCase();
-
     const webhookUrl = process.env.SLACK_WEBHOOK_URL;
     if (!webhookUrl) {
-      return NextResponse.json(
-        { error: "Missing SLACK_WEBHOOK_URL env variable" },
-        { 
+      return new NextResponse(
+        JSON.stringify({ error: "Missing SLACK_WEBHOOK_URL env variable" }),
+        {
           status: 500,
-          headers: { "Access-Control-Allow-Origin": "*" } // Allow error to be seen
+          headers: buildCorsHeaders(origin),
         }
       );
     }
 
-    // Format Slack ticket message
-    const text = `
-🟢 *New Human Handoff Request* (#${ticketId})
+    // Unique ticket ID
+    const ticketId = Math.random().toString(36).substring(2, 10).toUpperCase();
+
+    // Label based on type
+    const label =
+      body.type === "progressive_profile"
+        ? "🟣 Progressive Profile Update"
+        : "🟢 Human Handoff Request";
+
+    const slackMessage = `
+${label}  (#${ticketId})
 
 *Name:* ${body.name}
 *Email:* ${body.email}
@@ -41,20 +82,19 @@ export async function POST(req: Request) {
 *Company:* ${body.company || "N/A"}
 
 *Message:*
-${body.message}
+${body.message || "_No message provided_"}
 
-*Transcript (for context):*
+*Transcript:*
 ${body.transcript || "_No transcript provided_"}
-`;
+`.trim();
 
-    // --- Send to Slack & capture response ---
+    // Send to Slack
     const slackResp = await fetch(webhookUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text: slackMessage }),
     });
 
-    // Slack webhook may return empty or JSON — safely attempt parsing
     let slackData: any = {};
     try {
       slackData = await slackResp.json();
@@ -62,32 +102,25 @@ ${body.transcript || "_No transcript provided_"}
       slackData = {};
     }
 
-    // Return ticket details + CORS Headers (Crucial!)
-    return NextResponse.json(
-      {
+    return new NextResponse(
+      JSON.stringify({
         ok: true,
         ticketId,
         slackTs: slackData.ts || null,
-      },
+      }),
       {
         status: 200,
-        headers: {
-          "Access-Control-Allow-Origin": "*", // <--- THIS FIXES THE CORS ERROR
-          "Access-Control-Allow-Methods": "POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type",
-        },
+        headers: buildCorsHeaders(origin),
       }
     );
-
   } catch (err) {
     console.error("Error in /api/handoff:", err);
-    return NextResponse.json(
-      { error: "Failed to send handoff" },
-      { 
+
+    return new NextResponse(
+      JSON.stringify({ error: "Failed to process handoff" }),
+      {
         status: 500,
-        headers: {
-          "Access-Control-Allow-Origin": "*", // Allow error to be seen
-        } 
+        headers: buildCorsHeaders(origin),
       }
     );
   }
