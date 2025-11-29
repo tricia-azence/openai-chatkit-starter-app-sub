@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -262,18 +261,12 @@ export function ChatKitPanel({
     [isWorkflowConfigured, setErrorState]
   );
 
-const chatkit = useChatKit({
-  api: { getClientSecret },
-  theme: {
-    colorScheme: theme,
-    ...getThemeConfig(theme),
-    container: {
-      backgroundColor: "#FFFFFF",
+  const chatkit = useChatKit({
+    api: { getClientSecret },
+    theme: {
+      colorScheme: theme,
+      ...getThemeConfig(theme),
     },
-    thread: {
-      backgroundColor: "#FFFFFF",
-    },
-  },
     startScreen: {
       greeting: GREETING,
       prompts: STARTER_PROMPTS,
@@ -289,7 +282,6 @@ const chatkit = useChatKit({
       feedback: false,
     },
     onClientTool: async (invocation: {
-      console.log("TOOL INVOCATION:", invocation.name, invocation.params);
       name: string;
       params: Record<string, unknown>;
     }) => {
@@ -319,35 +311,7 @@ const chatkit = useChatKit({
         });
         return { success: true };
       }
-      // NEW — Slack human handoff handler
-if (invocation.name === "handoff_to_slack") {
-  try {
-    // CHANGE THIS LINE: Use your full Vercel domain
-    const response = await fetch("https://openai-chatkit-starter-app-sub.vercel.app/api/handoff", { 
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(invocation.params),
-    });
 
-    // Parse the response to check for errors properly
-    if (!response.ok) {
-        throw new Error(`Server error: ${response.status}`);
-    }
-
-    return {
-      success: true,
-      message: "Thanks! Your details have been sent to the Azence team. A human will reach out shortly.",
-    };
-  } catch (err) {
-    console.error("Slack handoff failed:", err);
-    return {
-      success: false,
-      message: "Something went wrong while connecting you with a human. Please try again.",
-    };
-  }
-}
       return { success: false };
     },
     onResponseEnd: () => {
