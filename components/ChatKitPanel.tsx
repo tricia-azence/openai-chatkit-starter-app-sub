@@ -237,10 +237,11 @@ export function ChatKitPanel({
     threadItemActions: { feedback: false },
 
     onClientTool: async (invocation: {
-      console.log("TOOL INVOCATION:", invocation.name, invocation.params);
       name: string;
       params: Record<string, unknown>;
     }) => {
+
+      console.log("TOOL INVOCATION:", invocation.name, invocation.params);
       if (invocation.name === "switch_theme") {
         const requested = invocation.params.theme;
         if (requested === "light" || requested === "dark") {
