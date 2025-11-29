@@ -311,7 +311,31 @@ export function ChatKitPanel({
         });
         return { success: true };
       }
+// NEW — Slack human handoff handler
+if (invocation.name === "handoff_to_slack") {
+  try {
+    await fetch("/api/handoff", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(invocation.params),
+    });
 
+    return {
+      success: true,
+      message:
+        "Thanks! Your details have been sent to the Azence team. A human will reach out shortly.",
+    };
+  } catch (err) {
+    console.error("Slack handoff failed:", err);
+    return {
+      success: false,
+      message:
+        "Something went wrong while connecting you with a human. Please try again.",
+    };
+  }
+}
       return { success: false };
     },
     onResponseEnd: () => {
