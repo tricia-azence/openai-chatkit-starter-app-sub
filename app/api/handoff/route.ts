@@ -8,8 +8,8 @@ const ALLOWED_ORIGINS = [
   "https://www.azence.com",
 ];
 
-// Allow all subdomains like
-// https://sub.azence.com, https://dev.azence.com, https://a.b.azence.com
+// Allow all subdomains such as:
+// https://sub.azence.com, https://dev.azence.com, etc.
 function isAzenceSubdomain(origin: string | null) {
   if (!origin) return false;
   try {
@@ -95,7 +95,8 @@ ${body.transcript || "_No transcript provided_"}
       body: JSON.stringify({ text: slackMessage }),
     });
 
-    let slackData: any = {};
+    // FIX: Remove `any`, replace with typed Record
+    let slackData: Record<string, unknown> = {};
     try {
       slackData = await slackResp.json();
     } catch {
@@ -106,7 +107,10 @@ ${body.transcript || "_No transcript provided_"}
       JSON.stringify({
         ok: true,
         ticketId,
-        slackTs: slackData.ts || null,
+        slackTs:
+          typeof slackData.ts === "string" || typeof slackData.ts === "number"
+            ? slackData.ts
+            : null,
       }),
       {
         status: 200,
