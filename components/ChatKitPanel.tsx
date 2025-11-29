@@ -1,3 +1,5 @@
+// FULL FILE — NO-ANY, ESLINT-CLEAN VERSION
+
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -12,6 +14,10 @@ import {
 } from "@/lib/config";
 import { ErrorOverlay } from "./ErrorOverlay";
 import type { ColorScheme } from "@/hooks/useColorScheme";
+
+// ----------------------
+// TYPES
+// ----------------------
 
 export type FactAction = {
   type: "save";
@@ -57,7 +63,9 @@ type ClientToolInvocation = {
   params: Record<string, unknown>;
 };
 
+// ----------------------
 const isBrowser = typeof window !== "undefined";
+// ----------------------
 
 const createInitialErrors = (): ErrorState => ({
   script: null,
@@ -65,6 +73,10 @@ const createInitialErrors = (): ErrorState => ({
   integration: null,
   retryable: false,
 });
+
+// ----------------------
+// MAIN COMPONENT
+// ----------------------
 
 export function ChatKitPanel({
   theme,
@@ -78,12 +90,20 @@ export function ChatKitPanel({
   const isMountedRef = useRef(true);
   const [scriptStatus, setScriptStatus] = useState<
     "pending" | "ready" | "error"
-  >(isBrowser && window.customElements?.get("openai-chatkit") ? "ready" : "pending");
+  >(
+    isBrowser && window.customElements?.get("openai-chatkit")
+      ? "ready"
+      : "pending"
+  );
   const [widgetInstanceKey, setWidgetInstanceKey] = useState(0);
 
   const setErrorState = useCallback((updates: Partial<ErrorState>) => {
     setErrors((current) => ({ ...current, ...updates }));
   }, []);
+
+  // ----------------------
+  // Script load checker
+  // ----------------------
 
   useEffect(() => {
     return () => {
@@ -91,7 +111,6 @@ export function ChatKitPanel({
     };
   }, []);
 
-  // ChatKit script load checks
   useEffect(() => {
     if (!isBrowser) return;
 
@@ -105,10 +124,11 @@ export function ChatKitPanel({
 
     const handleError = (event: Event) => {
       if (!isMountedRef.current) return;
-      console.error("Failed to load chatkit script:", event);
+
       const detail =
-        (event as CustomEvent<unknown>).detail instanceof Error
-          ? (event as CustomEvent<unknown>).detail.message
+        event instanceof CustomEvent &&
+        typeof event.detail === "string"
+          ? event.detail
           : "unknown error";
 
       setScriptStatus("error");
@@ -122,11 +142,10 @@ export function ChatKitPanel({
     if (!window.customElements?.get("openai-chatkit") && scriptStatus === "pending") {
       timeoutId = window.setTimeout(() => {
         if (!window.customElements?.get("openai-chatkit")) {
-          handleError(
-            new CustomEvent("chatkit-script-error", {
-              detail: "ChatKit component unavailable or script failed to load.",
-            })
-          );
+          const evt = new CustomEvent("chatkit-script-error", {
+            detail: "ChatKit script failed to load",
+          });
+          handleError(evt);
         }
       }, 5000);
     }
@@ -138,18 +157,26 @@ export function ChatKitPanel({
     };
   }, [scriptStatus, setErrorState]);
 
+  // ----------------------
+  // Workflow Setup
+  // ----------------------
+
   const isWorkflowConfigured =
     Boolean(WORKFLOW_ID) && !WORKFLOW_ID.startsWith("wf_replace");
 
   useEffect(() => {
     if (!isWorkflowConfigured && isMountedRef.current) {
       setErrorState({
-        session: "Set NEXT_PUBLIC_CHATKIT_WORKFLOW_ID in your .env.local file.",
+        session: "Set NEXT_PUBLIC_CHATKIT_WORKFLOW_ID in your .env.local.",
         retryable: false,
       });
       setIsInitializingSession(false);
     }
   }, [isWorkflowConfigured, setErrorState]);
+
+  // ----------------------
+  // RESET CHAT
+  // ----------------------
 
   const handleResetChat = useCallback(() => {
     processedFacts.current.clear();
@@ -163,19 +190,22 @@ export function ChatKitPanel({
     setWidgetInstanceKey((prev) => prev + 1);
   }, []);
 
-  // Create ChatKit session
+  // ----------------------
+  // SESSION CREATION
+  // ----------------------
+
   const getClientSecret = useCallback(
     async (currentSecret: string | null): Promise<string> => {
       if (!isWorkflowConfigured) {
         const msg = "Set NEXT_PUBLIC_CHATKIT_WORKFLOW_ID.";
-        setErrorState({ session: msg, retryable: false });
+        setErrorState({ session: msg });
         setIsInitializingSession(false);
         throw new Error(msg);
       }
 
       if (isMountedRef.current) {
         if (!currentSecret) setIsInitializingSession(true);
-        setErrorState({ session: null, integration: null });
+        setErrorState({ session: null });
       }
 
       try {
@@ -194,27 +224,24 @@ export function ChatKitPanel({
         try {
           data = JSON.parse(raw);
         } catch {
-          // silently ignore parse errors
+          // ignore parse failures
         }
 
         if (!response.ok) {
           throw new Error(
-            extractErrorDetail(
-              data as Record<string, unknown>,
-              response.statusText || "Session error"
-            )
+            extractErrorDetail(data, response.statusText || "Session error")
           );
         }
 
         const clientSecret = data.client_secret;
         if (typeof clientSecret !== "string") {
-          throw new Error("Missing client_secret in response");
+          throw new Error("Missing client_secret");
         }
 
         return clientSecret;
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "Failed to start session.";
-        setErrorState({ session: msg, retryable: false });
+        const msg = err instanceof Error ? err.message : "Session failed.";
+        setErrorState({ session: msg });
         throw new Error(msg);
       } finally {
         if (isMountedRef.current && !currentSecret) {
@@ -225,14 +252,17 @@ export function ChatKitPanel({
     [isWorkflowConfigured, setErrorState]
   );
 
-  // Initialize chatkit
+  // ----------------------
+  // CHATKIT INIT
+  // ----------------------
+
   const chatkit = useChatKit({
     api: { getClientSecret },
     theme: {
       colorScheme: theme,
       ...getThemeConfig(theme),
-      container: { backgroundColor: "#FFFFFF" },
-      thread: { backgroundColor: "#FFFFFF" },
+      container: { backgroundColor: "#fff" },
+      thread: { backgroundColor: "#fff" },
     },
     startScreen: {
       greeting: GREETING,
@@ -244,44 +274,44 @@ export function ChatKitPanel({
     },
     threadItemActions: { feedback: false },
 
+    // -------------------
     // TOOL HANDLERS
+    // -------------------
     onClientTool: async (invocation: ClientToolInvocation) => {
-      console.log("TOOL INVOCATION:", invocation.name, invocation.params);
+      const { name, params } = invocation;
 
-      // Switch theme
-      if (invocation.name === "switch_theme") {
-        const params = invocation.params as SwitchThemeParams;
-        if (params.theme === "light" || params.theme === "dark") {
-          onThemeRequest(params.theme);
+      // Theme switch
+      if (name === "switch_theme") {
+        const p = params as SwitchThemeParams;
+        if (p.theme === "light" || p.theme === "dark") {
+          onThemeRequest(p.theme);
           return { success: true };
         }
         return { success: false };
       }
 
-      // Record facts
-      if (invocation.name === "record_fact") {
-        const params = invocation.params as RecordFactParams;
-        const id = params.fact_id ? String(params.fact_id) : "";
-        const text = params.fact_text ? String(params.fact_text) : "";
+      // Record fact
+      if (name === "record_fact") {
+        const p = params as RecordFactParams;
+        const id = p.fact_id ? String(p.fact_id) : "";
+        const text = p.fact_text ? String(p.fact_text) : "";
 
-        if (!id || processedFacts.current.has(id)) {
-          return { success: true };
+        if (id && !processedFacts.current.has(id)) {
+          processedFacts.current.add(id);
+
+          await onWidgetAction({
+            type: "save",
+            factId: id,
+            factText: text.replace(/\s+/g, " ").trim(),
+          });
         }
-
-        processedFacts.current.add(id);
-
-        await onWidgetAction({
-          type: "save",
-          factId: id,
-          factText: text.replace(/\s+/g, " ").trim(),
-        });
 
         return { success: true };
       }
 
-      // Unified progressive + handoff to Slack
-      if (invocation.name === "handoff_to_slack") {
-        const params = invocation.params as HandoffParams;
+      // Handoff to Slack
+      if (name === "handoff_to_slack") {
+        const p = params as HandoffParams;
 
         try {
           const response = await fetch(
@@ -289,7 +319,7 @@ export function ChatKitPanel({
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(params),
+              body: JSON.stringify(p),
             }
           );
 
@@ -302,12 +332,10 @@ export function ChatKitPanel({
             message:
               "Thanks — your details have been sent to the Azence team. A human will reach out soon.",
           };
-        } catch (err) {
-          console.error("Slack handoff failed:", err);
+        } catch {
           return {
             success: false,
-            message:
-              "Something went wrong while connecting you with a human. Please try again.",
+            message: "Something went wrong. Please try again.",
           };
         }
       }
@@ -316,15 +344,15 @@ export function ChatKitPanel({
     },
 
     onResponseEnd,
-    onResponseStart: () => {
-      setErrorState({ integration: null, retryable: false });
-    },
+    onResponseStart: () => setErrorState({ integration: null }),
     onThreadChange: () => processedFacts.current.clear(),
     onError: ({ error }) => console.error("ChatKit error:", error),
   });
 
+  // ----------------------
   const activeError = errors.session ?? errors.integration;
   const blockingError = errors.script ?? activeError;
+  // ----------------------
 
   return (
     <div className="relative pb-8 flex h-[90vh] w-full rounded-2xl flex-col overflow-hidden bg-white shadow-sm dark:bg-slate-900">
@@ -337,7 +365,6 @@ export function ChatKitPanel({
             : "block h-full w-full"
         }
       />
-
       <ErrorOverlay
         error={blockingError}
         fallbackMessage={
@@ -352,36 +379,39 @@ export function ChatKitPanel({
   );
 }
 
+// ----------------------
+// ERROR DETAIL PARSER
+// ----------------------
 function extractErrorDetail(
   payload: Record<string, unknown> | undefined,
   fallback: string
 ): string {
   if (!payload) return fallback;
 
-  // payload.error
-  const topError = payload.error;
-  if (typeof topError === "string") return topError;
+  // top-level payload.error
+  const top = payload.error;
+  if (typeof top === "string") return top;
   if (
-    typeof topError === "object" &&
-    topError !== null &&
-    "message" in topError &&
-    typeof (topError as Record<string, unknown>).message === "string"
+    top &&
+    typeof top === "object" &&
+    "message" in top &&
+    typeof (top as Record<string, unknown>).message === "string"
   ) {
-    return (topError as Record<string, unknown>).message as string;
+    return (top as Record<string, unknown>).message as string;
   }
 
   // payload.details
   const details = payload.details;
   if (typeof details === "string") return details;
 
-  if (typeof details === "object" && details !== null) {
+  if (details && typeof details === "object") {
     const nested = (details as Record<string, unknown>).error;
 
     if (typeof nested === "string") return nested;
 
     if (
+      nested &&
       typeof nested === "object" &&
-      nested !== null &&
       "message" in nested &&
       typeof (nested as Record<string, unknown>).message === "string"
     ) {
