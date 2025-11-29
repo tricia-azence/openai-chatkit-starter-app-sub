@@ -78,18 +78,22 @@ export function ChatKitPanel({
     };
 
     const handleError = (event: Event) => {
-      if (!isMountedRef.current) return;
-      console.error("Failed to load chatkit.js", event);
+  if (!isMountedRef.current) return;
+  console.error("Failed to load chatkit.js", event);
 
-      const detail =
-        (event as CustomEvent<unknown>).detail instanceof Error
-          ? (event as CustomEvent<unknown>).detail.message
-          : "unknown error";
+  let detail = "unknown error";
+  const custom = event as CustomEvent<unknown>;
 
-      setScriptStatus("error");
-      setErrorState({ script: `Error: ${detail}`, retryable: false });
-      setIsInitializingSession(false);
-    };
+  if (custom.detail instanceof Error) {
+    detail = custom.detail.message;
+  } else if (typeof custom.detail === "string") {
+    detail = custom.detail;
+  }
+
+  setScriptStatus("error");
+  setErrorState({ script: `Error: ${detail}`, retryable: false });
+  setIsInitializingSession(false);
+};
 
     window.addEventListener("chatkit-script-loaded", handleLoaded);
     window.addEventListener("chatkit-script-error", handleError as EventListener);
